@@ -1,0 +1,558 @@
+--New example script written by wally
+-- You can suggest changes with a pull request or something
+
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Window = Library:CreateWindow({
+    Title = 'Celestial',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+    })
+
+    local Tabs = {
+        Main = Window:AddTab('Main'),
+        Movement = Window : AddTab('Movement'),
+        Visuals = Window : AddTab('Visuals'), --New Visuals tab
+        ['UI Settings'] = Window : AddTab('UI Settings'),
+}
+
+--Camlock Group
+local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Camlock')
+
+--Aimbot Configuration
+getgenv().Aimbot = {
+    Bind = "C", --Default keybind for aimbot
+    HitPart = "Head", --Default hit part
+    Time = 0.05, --Smoothness
+    Prediction = 0.09 --Default prediction value
+}
+
+--Movement Configuration
+getgenv().Movement = {
+    CFrameSpeedEnabled = false, --Default CFrame speed toggle state
+    CFrameSpeed = 0.1, --Default CFrame speed
+    CFrameSpeedBind = "V" --Default keybind for CFrame speed
+}
+
+--Aimbot Variables
+local Workspace = game:GetService("Workspace")
+local Players = game : GetService("Players")
+local UserInputService = game : GetService("UserInputService")
+local RunService = game : GetService("RunService")
+local TweenService = game : GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer : GetMouse()
+local Camera = Workspace.CurrentCamera
+
+local IsToggled = false
+local Target
+local Tween
+local Info
+local Cycle
+
+-- Aimbot Functions
+local function GetTarget()
+local ClosestPlayer, ClosestDistance = nil, math.huge
+for _, Plr in pairs(Players:GetPlayers()) do
+if Plr ~= LocalPlayer then
+if Plr.Character and Plr.Character[getgenv().Aimbot.HitPart] and Plr.Character:FindFirstChild("HumanoidRootPart") then
+local ScreenPos, Visible = Camera : WorldToScreenPoint(Plr.Character[getgenv().Aimbot.HitPart].Position)
+if Visible then
+local MousePos = Vector2.new(Mouse.X, Mouse.Y)
+ScreenPos = Vector2.new(ScreenPos.X, ScreenPos.Y)
+local Difference = (ScreenPos - MousePos).Magnitude
+if Difference < ClosestDistance then
+    ClosestDistance = Difference
+    ClosestPlayer = Plr
+    end
+    end
+    end
+    end
+    end
+    Target = ClosestPlayer
+    end
+
+    local function main()
+    GetTarget()
+    Cycle = RunService.RenderStepped:Connect(function()
+        if Target and Target.Character and Target.Character[getgenv().Aimbot.HitPart] and Target.Character:FindFirstChild("HumanoidRootPart") then
+            if getgenv().Aimbot.Time == 0.01 then
+                -- No smoothing, directly lock onto the target
+                local LookAt = CFrame.lookAt(Camera.CFrame.Position, Target.Character[getgenv().Aimbot.HitPart].Position + Vector3.new(
+                    Target.Character:FindFirstChild("HumanoidRootPart").Velocity.X * getgenv().Aimbot.Prediction,
+                    Target.Character : FindFirstChild("HumanoidRootPart").Velocity.Y * getgenv().Aimbot.Prediction,
+                    Target.Character : FindFirstChild("HumanoidRootPart").Velocity.Z * getgenv().Aimbot.Prediction
+                    ))
+                Camera.CFrame = LookAt
+            else
+                --Use TweenService for smoothing
+                Info = TweenInfo.new(getgenv().Aimbot.Time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+                local LookAt = CFrame.lookAt(Camera.CFrame.Position, Target.Character[getgenv().Aimbot.HitPart].Position + Vector3.new(
+                    Target.Character:FindFirstChild("HumanoidRootPart").Velocity.X * getgenv().Aimbot.Prediction,
+                    Target.Character : FindFirstChild("HumanoidRootPart").Velocity.Y * getgenv().Aimbot.Prediction,
+                    Target.Character : FindFirstChild("HumanoidRootPart").Velocity.Z * getgenv().Aimbot.Prediction
+                    ))
+                Tween = TweenService:Create(Camera, Info, { CFrame = LookAt })
+                Tween : Play()
+                end
+        else
+            Cycle:Disconnect()
+            end
+            end)
+    end
+
+    -- Toggle Aimbot
+    LeftGroupBox : AddToggle('MyToggle', {
+        Text = 'Camlock Toggle',
+        Default = false,
+        Tooltip = 'Enable/Disable Camlock',
+        Callback = function(Value)
+            if Value then
+                main()
+            else
+                if Tween then Tween : Cancel() end
+                if Cycle then Cycle : Disconnect() end
+            end
+        end
+        })
+
+    --Keybind for Aimbot
+    LeftGroupBox : AddLabel('Keybind') : AddKeyPicker('KeyPicker', {
+        Default = 'C',
+        SyncToggleState = false,
+        Mode = 'Toggle',
+        Text = 'Camlock Keybind',
+        NoUI = false,
+        Callback = function(Value)
+            Toggles.MyToggle:SetValue(not Toggles.MyToggle.Value) --Toggle on / off
+        end
+        })
+
+    --Slider for Smoothness(0.01 to 1)
+    LeftGroupBox:AddSlider('MySlider', {
+        Text = 'Smoothness',
+        Default = 0.05,
+        Min = 0.01,
+        Max = 1, --Smoothness now goes up to 1
+        Rounding = 2,
+        Compact = false,
+        Callback = function(Value)
+            getgenv().Aimbot.Time = Value
+        end
+        })
+
+    --Slider for Prediction(0 to 20)
+    LeftGroupBox:AddSlider('PredictionSlider', {
+        Text = 'Prediction',
+        Default = 0.09,
+        Min = 0,
+        Max = 20, --Prediction now goes up to 20
+        Rounding = 2,
+        Compact = false,
+        Callback = function(Value)
+            getgenv().Aimbot.Prediction = Value
+        end
+        })
+
+    --Dropdown for Hit Part
+    LeftGroupBox : AddDropdown('MyDropdown', {
+        Values = { 'Head', 'UpperTorso', 'LowerTorso', 'HumanoidRootPart' }, --Added UpperTorso and LowerTorso
+        Default = 1,
+        Multi = false,
+        Text = 'Hit Part',
+        Tooltip = 'Select the part to aim at',
+        Callback = function(Value)
+            getgenv().Aimbot.HitPart = Value -- Update the HitPart dynamically
+            print('HitPart changed to:', Value)
+        end
+        })
+
+        --Movement Tab
+        local MovementGroupBox = Tabs.Movement:AddLeftGroupbox('Movement')
+
+        --CFrame Speed Toggle(Existing Code)
+        MovementGroupBox : AddToggle('CFrameSpeedToggle', {
+            Text = 'Enable CFrame Speed',
+            Default = false,
+            Tooltip = 'Enable/Disable CFrame Speed',
+            Callback = function(Value)
+                getgenv().Movement.CFrameSpeedEnabled = Value
+            end
+            })
+
+        --Keybind for CFrame Speed(Existing Code)
+        MovementGroupBox:AddLabel('Keybind') : AddKeyPicker('CFrameSpeedKeybind', {
+            Default = 'V', --Default keybind for CFrame speed
+            SyncToggleState = false,
+            Mode = 'Toggle',
+            Text = 'CFrame Speed Keybind',
+            NoUI = false,
+            Callback = function(Value)
+                getgenv().Movement.CFrameSpeedEnabled = not getgenv().Movement.CFrameSpeedEnabled
+                Toggles.CFrameSpeedToggle:SetValue(getgenv().Movement.CFrameSpeedEnabled) --Sync the toggle state
+            end
+            })
+
+        --Slider for CFrame Speed(Existing Code)
+        MovementGroupBox:AddSlider('CFrameSpeedSlider', {
+            Text = 'CFrame Speed',
+            Default = 0.1,
+            Min = 0.05,
+            Max = 2, --CFrame speed now goes up to 2
+            Rounding = 2,
+            Compact = false,
+            Callback = function(Value)
+                getgenv().Movement.CFrameSpeed = Value
+            end
+            })
+
+        --CFrame Speed Logic(Existing Code)
+        RunService.Heartbeat:Connect(function()
+            if getgenv().Movement.CFrameSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character : FindFirstChild("Humanoid") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame =
+                LocalPlayer.Character.HumanoidRootPart.CFrame +
+                LocalPlayer.Character.Humanoid.MoveDirection * getgenv().Movement.CFrameSpeed
+                end
+                end)
+
+        -- ============================================
+        --PASTE THE UPDATED FLY SCRIPT HERE
+        -- ============================================
+
+        --Fly Script
+        local flyEnabled = false
+        local flySpeed = 20
+
+        --Function to handle fly logic
+        local function Fly()
+        local connection
+        connection = RunService.Heartbeat:Connect(function(delta_time)
+            if flyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local move_direction = LocalPlayer.Character.Humanoid.MoveDirection
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local add = Vector3.new(0, (UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService : IsKeyDown(Enum.KeyCode.LeftShift) and -flySpeed / 8) or 0, 0)
+                hrp.CFrame = hrp.CFrame + (move_direction * delta_time) * flySpeed * 10
+                hrp.CFrame = hrp.CFrame + add
+                hrp.Velocity = (hrp.Velocity * Vector3.new(1, 0, 1)) + Vector3.new(0, 1.9, 0)
+            else
+                --Disconnect the Heartbeat connection if fly is disabled
+                if connection then
+                    connection : Disconnect()
+                    connection = nil
+                    end
+                    end
+                    end)
+        end
+
+        -- Add Fly Toggle
+        MovementGroupBox : AddToggle('FlyToggle', {
+            Text = 'Enable Fly',
+            Default = false, --Default to false so it doesn't auto-toggle on load
+            Tooltip = 'Enable/Disable Fly',
+            Callback = function(Value)
+                flyEnabled = Value
+                if Value then
+                    Fly() --Start fly when toggled on
+                end
+            end
+            })
+
+        --Add Fly Keybind
+        MovementGroupBox : AddLabel('Keybind') : AddKeyPicker('FlyKeybind', {
+            Default = 'F', --Default keybind for fly
+            SyncToggleState = false,
+            Mode = 'Toggle',
+            Text = 'Fly Keybind',
+            NoUI = false,
+            Callback = function(Value)
+                flyEnabled = not flyEnabled -- Toggle fly on / off
+                Toggles.FlyToggle:SetValue(flyEnabled) --Sync the toggle state
+            end
+            })
+
+        --Add Fly Speed Slider
+        MovementGroupBox : AddSlider('FlySpeedSlider', {
+            Text = 'Fly Speed',
+            Default = 20,
+            Min = 10,
+            Max = 50, --Fly speed now goes up to 50
+            Rounding = 1,
+            Compact = false,
+            Callback = function(Value)
+                flySpeed = Value -- Update fly speed dynamically
+            end
+            })
+
+    --Visuals Tab
+    local VisualsGroupBox = Tabs.Visuals:AddLeftGroupbox('Visuals')
+
+    --Name ESP Variables
+    local NameESPEnabled = false
+    local NameESPTexts = {}
+
+    --Function to create or update Name ESP
+    local function UpdateNameESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local head = player.Character : FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = Camera : WorldToViewportPoint(head.Position + Vector3.new(0, 2, 0)) --Position above the head
+
+                if onScreen then
+                    if not NameESPTexts[player] then
+                        NameESPTexts[player] = Drawing.new("Text")
+                        NameESPTexts[player].Text = player.Name
+                        NameESPTexts[player].Size = 15
+                        NameESPTexts[player].Color = Color3.new(1, 1, 1)
+                        NameESPTexts[player].Outline = true
+                        NameESPTexts[player].Center = true
+                        end
+
+                        NameESPTexts[player].Position = Vector2.new(screenPos.X, screenPos.Y)
+                        NameESPTexts[player].Visible = true
+                    else
+                        if NameESPTexts[player] then
+                            NameESPTexts[player].Visible = false
+                            end
+                            end
+                            end
+                        else
+                            if NameESPTexts[player] then
+                                NameESPTexts[player].Visible = false
+                                end
+                                end
+                                end
+                                end
+
+                                -- Function to clean up Name ESP
+                                local function CleanupNameESP()
+                                for _, text in pairs(NameESPTexts) do
+                                    text:Remove()
+                                    end
+                                    NameESPTexts = {}
+                                    end
+
+                                    -- Name ESP Smooth Movement Loop
+                                    local function NameESPLoop()
+                                    while NameESPEnabled do
+                                        for player, text in pairs(NameESPTexts) do
+                                            if player.Character and player.Character:FindFirstChild("Head") then
+                                                local head = player.Character : FindFirstChild("Head")
+                                                local screenPos, onScreen = Camera : WorldToViewportPoint(head.Position + Vector3.new(0, 2, 0)) --Position above the head
+
+                                                if onScreen then
+                                                    text.Position = Vector2.new(screenPos.X, screenPos.Y)
+                                                    text.Visible = true
+                                                else
+                                                    text.Visible = false
+                                                    end
+                                            else
+                                                text.Visible = false
+                                                end
+                                                end
+                                                RunService.RenderStepped:Wait() --Update every frame
+                                                end
+                                                end
+
+                                                -- Name ESP Toggle
+                                                VisualsGroupBox : AddToggle('NameESPToggle', {
+                                                    Text = 'Enable Name ESP',
+                                                    Default = false,
+                                                    Tooltip = 'Enable/Disable Name ESP',
+                                                    Callback = function(Value)
+                                                        NameESPEnabled = Value
+                                                        if Value then
+                                                            coroutine.wrap(NameESPLoop)() --Start the smooth movement loop
+                                                            UpdateNameESP() --Initialize ESP for all players
+                                                        else
+                                                            CleanupNameESP() --Clean up when toggled off
+                                                        end
+                                                    end
+                                                    })
+
+                                                --Box ESP Variables
+                                                local BoxESPEnabled = false
+                                                local BoxESPOutlines = {}
+
+                                                --Function to create or update Box ESP
+                                                local function UpdateBoxESP()
+                                                for _, player in pairs(Players:GetPlayers()) do
+                                                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                                        local rootPart = player.Character.HumanoidRootPart
+                                                        local screenPos, onScreen = Camera : WorldToViewportPoint(rootPart.Position)
+
+                                                        if onScreen then
+                                                            if not BoxESPOutlines[player] then
+                                                                BoxESPOutlines[player] = Drawing.new("Square")
+                                                                BoxESPOutlines[player].Visible = true
+                                                                BoxESPOutlines[player].Color = Color3.new(1, 1, 1) --White color
+                                                                BoxESPOutlines[player].Thickness = 2
+                                                                BoxESPOutlines[player].Filled = false
+                                                                end
+
+                                                                -- Calculate the size of the box based on the player's height and width
+                                                                local character = player.Character
+                                                                local head = character:FindFirstChild("Head")
+                                                                local torso = character : FindFirstChild("HumanoidRootPart")
+                                                                if head and torso then
+                                                                    local headPos = Camera : WorldToViewportPoint(head.Position)
+                                                                    local torsoPos = Camera : WorldToViewportPoint(torso.Position)
+                                                                    local height = (headPos.Y - torsoPos.Y) * 2
+                                                                    local width = height / 2
+
+                                                                    BoxESPOutlines[player].Position = Vector2.new(torsoPos.X - width / 2, torsoPos.Y - height / 2)
+                                                                    BoxESPOutlines[player].Size = Vector2.new(width, height)
+                                                                    BoxESPOutlines[player].Visible = true
+                                                                    end
+                                                                else
+                                                                    if BoxESPOutlines[player] then
+                                                                        BoxESPOutlines[player].Visible = false
+                                                                        end
+                                                                        end
+                                                                    else
+                                                                        if BoxESPOutlines[player] then
+                                                                            BoxESPOutlines[player].Visible = false
+                                                                            end
+                                                                            end
+                                                                            end
+                                                                            end
+
+                                                                            -- Function to clean up Box ESP
+                                                                            local function CleanupBoxESP()
+                                                                            for _, box in pairs(BoxESPOutlines) do
+                                                                                box:Remove()
+                                                                                end
+                                                                                BoxESPOutlines = {}
+                                                                                end
+
+                                                                                -- Box ESP Smooth Movement Loop
+                                                                                local function BoxESPLoop()
+                                                                                while BoxESPEnabled do
+                                                                                    for player, box in pairs(BoxESPOutlines) do
+                                                                                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                                                                            local rootPart = player.Character.HumanoidRootPart
+                                                                                            local screenPos, onScreen = Camera : WorldToViewportPoint(rootPart.Position)
+
+                                                                                            if onScreen then
+                                                                                                -- Calculate the size of the box based on the player's height and width
+                                                                                                local character = player.Character
+                                                                                                local head = character : FindFirstChild("Head")
+                                                                                                local torso = character : FindFirstChild("HumanoidRootPart")
+                                                                                                if head and torso then
+                                                                                                    local headPos = Camera : WorldToViewportPoint(head.Position)
+                                                                                                    local torsoPos = Camera : WorldToViewportPoint(torso.Position)
+                                                                                                    local height = (headPos.Y - torsoPos.Y) * 2
+                                                                                                    local width = height / 2
+
+                                                                                                    box.Position = Vector2.new(torsoPos.X - width / 2, torsoPos.Y - height / 2)
+                                                                                                    box.Size = Vector2.new(width, height)
+                                                                                                    box.Visible = true
+                                                                                                    end
+                                                                                                else
+                                                                                                    box.Visible = false
+                                                                                                    end
+                                                                                            else
+                                                                                                box.Visible = false
+                                                                                                end
+                                                                                                end
+                                                                                                RunService.RenderStepped:Wait() --Update every frame
+                                                                                                end
+                                                                                                end
+
+                                                                                                -- Box ESP Toggle
+                                                                                                VisualsGroupBox : AddToggle('BoxESPToggle', {
+                                                                                                    Text = 'Enable Box ESP',
+                                                                                                    Default = false,
+                                                                                                    Tooltip = 'Enable/Disable Box ESP',
+                                                                                                    Callback = function(Value)
+                                                                                                        BoxESPEnabled = Value
+                                                                                                        if Value then
+                                                                                                            coroutine.wrap(BoxESPLoop)() --Start the smooth movement loop
+                                                                                                            UpdateBoxESP() --Initialize ESP for all players
+                                                                                                        else
+                                                                                                            CleanupBoxESP() --Clean up when toggled off
+                                                                                                        end
+                                                                                                    end
+                                                                                                    })
+
+                                                                                                --Chams ESP Variables
+                                                                                                local ChamsEnabled = false
+                                                                                                local ChamsHighlights = {}
+
+                                                                                                --Function to apply Chams to a player
+                                                                                                local function ApplyChams(player)
+                                                                                                if player.Character and not ChamsHighlights[player] then
+                                                                                                    local highlight = Instance.new("Highlight")
+                                                                                                    highlight.Parent = player.Character
+                                                                                                    highlight.FillColor = Color3.fromRGB(128, 0, 128) --Purple
+                                                                                                    highlight.OutlineColor = Color3.fromRGB(128, 0, 128) --Purple
+                                                                                                    highlight.FillTransparency = 0.5
+                                                                                                    highlight.OutlineTransparency = 0
+                                                                                                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Makes Chams visible through walls
+                                                                                                    ChamsHighlights[player] = highlight
+                                                                                                    end
+                                                                                                    end
+
+                                                                                                    -- Function to remove Chams from a player
+                                                                                                    local function RemoveChams(player)
+                                                                                                    if ChamsHighlights[player] then
+                                                                                                        ChamsHighlights[player]:Destroy()
+                                                                                                        ChamsHighlights[player] = nil
+                                                                                                        end
+                                                                                                        end
+
+                                                                                                        -- Chams ESP Refresh Loop
+                                                                                                        local function ChamsESPLoop()
+                                                                                                        while ChamsEnabled do
+                                                                                                            for _, player in pairs(Players:GetPlayers()) do
+                                                                                                                if player ~= LocalPlayer then
+                                                                                                                    ApplyChams(player)
+                                                                                                                    end
+                                                                                                                    end
+                                                                                                                    wait(5) --Refresh every 5 seconds
+                                                                                                                    end
+                                                                                                                    end
+
+                                                                                                                    -- Chams ESP Toggle
+                                                                                                                    VisualsGroupBox : AddToggle('ChamsToggle', {
+                                                                                                                        Text = 'Enable Chams ESP',
+                                                                                                                        Default = false,
+                                                                                                                        Tooltip = 'Enable/Disable Chams ESP',
+                                                                                                                        Callback = function(Value)
+                                                                                                                            ChamsEnabled = Value
+                                                                                                                            if Value then
+                                                                                                                                coroutine.wrap(ChamsESPLoop)() --Start the refresh loop
+                                                                                                                            else
+                                                                                                                                for _, player in pairs(Players:GetPlayers()) do
+                                                                                                                                    if player ~= LocalPlayer then
+                                                                                                                                        RemoveChams(player)
+                                                                                                                                    end
+                                                                                                                                end
+                                                                                                                            end
+                                                                                                                        end
+                                                                                                                        })
+
+                                                                                                                    --UI Settings
+                                                                                                                    local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+                                                                                                                    MenuGroup : AddButton('Unload', function() Library:Unload() end)
+                                                                                                                    MenuGroup : AddLabel('Menu bind') : AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
+
+                                                                                                                    Library.ToggleKeybind = Options.MenuKeybind
+
+                                                                                                                    -- Addons
+                                                                                                                    ThemeManager : SetLibrary(Library)
+                                                                                                                    SaveManager : SetLibrary(Library)
+                                                                                                                    SaveManager : IgnoreThemeSettings()
+                                                                                                                    SaveManager : SetIgnoreIndexes({ 'MenuKeybind' })
+                                                                                                                    ThemeManager : SetFolder('MyScriptHub')
+                                                                                                                    SaveManager : SetFolder('MyScriptHub/specific-game')
+                                                                                                                    SaveManager : BuildConfigSection(Tabs['UI Settings'])
+                                                                                                                    ThemeManager : ApplyToTab(Tabs['UI Settings'])
+                                                                                                                    SaveManager : LoadAutoloadConfig()
